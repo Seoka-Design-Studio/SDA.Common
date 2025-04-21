@@ -4,6 +4,9 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>Seoka Design Agency Common Core</Title>
+    <Authors>$(AssemblyName)</Authors>
   </PropertyGroup>
 
 </Project>
