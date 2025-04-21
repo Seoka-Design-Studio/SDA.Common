@@ -1,6 +1,2 @@
-﻿namespace SDA.Common.Services;
-
-public class Class1
-{
-
-}
+﻿global using MassTransit;
+global using SDA.Common.Services.Requests;
