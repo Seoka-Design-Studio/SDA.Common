@@ -1,78 +1,103 @@
-name: Deploy Minor Release NuGet Package 
-
+name: Deploy Minor Release NuGet Package.
 on:
   push:
     branches: [develop]
   pull_request:
     branches: [develop]
-    types: [closed]
     paths:
       - 'src/**'
       - '**/*.csproj'
       - '.github/workflows/nuget-deploy-develop.yml'
 
 jobs:
-  deploy-develop:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
       with:
-        fetch-depth: 0
+        fetch-depth: 0 # Required for GitVersion to work properly
 
-    - uses: actions/setup-dotnet@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
-        cache: 'nuget'
+        cache: 'nuget' # Cache NuGet packages
 
-    - uses: gittools/actions/gitversion/setup@v0.11.0
+    - name: Setup GitVersion
+      uses: gittools/actions/gitversion/setup@v0.11.0
       with:
         versionSpec: '5.x'
 
-    - id: gitversion
+    - name: Run GitVersion
+      id: gitversion
       uses: gittools/actions/gitversion/execute@v0.11.0
 
-    - id: sermv
+    - name: Process version (Semantic Release Manager)
+      id: sermv
       run: |
+        echo "Processing version with sermv..."
         VERSION="${{ steps.gitversion.outputs.fullSemVer }}"
-        if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
+        
+        # Skip early if pull request
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          echo "Pull request detected - skipping package publishing"
           echo "skip=true" >> $GITHUB_OUTPUT
           exit 0
         fi
-        if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.9(-.*)?$ ]]; then
+        
+        # Check if version ends with .9
+        if [[ $VERSION =~ ^([0-9]+)\.([0-9]+)\.9(-.*)?$ ]]; then
+          # Extract major and minor versions
           MAJOR="${BASH_REMATCH[1]}"
           MINOR="${BASH_REMATCH[2]}"
           SUFFIX="${BASH_REMATCH[3]:-}"
+          
+          # Increment minor version and set patch to 0
           NEW_MINOR=$((MINOR + 1))
-          VERSION="$MAJOR.$NEW_MINOR.0$SUFFIX"
+          NEW_VERSION="$MAJOR.$NEW_MINOR.0$SUFFIX"
+          
+          echo "Version $VERSION ends with .9 - incrementing to $NEW_VERSION"
+          VERSION="$NEW_VERSION"
+        else
+          echo "Version $VERSION does not end with .9 - using as is."
         fi
+        
+        echo "Using version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Setup NuGet config
+    - name: Create NuGet.config dynamically
+      run: |
+        echo "Creating NuGet.config file for GitHub Packages..."
+        cat << EOF > NuGet.config
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <add key="github" value="https://nuget.pkg.github.com/Seoka-Design-Studio/index.json" />
+          </packageSources>
+          <packageSourceCredentials>
+            <github>
+              <add key="Username" value="${{ secrets.GITHUB_USERNAME }}" />
+              <add key="ClearTextPassword" value="${{ secrets.GITHUB_PAT }}" />
+            </github>
+          </packageSourceCredentials>
+        </configuration>
+        EOF
+
+    - name: Restore dependencies
+      if: steps.sermv.outputs.skip != 'true'
+      run: dotnet restore
+
+    - name: Build and Pack
       if: steps.sermv.outputs.skip != 'true'
       run: |
-        dotnet nuget add source "https://nuget.pkg.github.com/Seoka-Design-Studio/index.json" \
-          --name github \
-          --username ${{ secrets.GITHUB_USERNAME }} \
-          --password ${{ secrets.GITHUB_PAT }} \
-          --store-password-in-clear-text
+        dotnet build -c Release --no-restore
+        dotnet pack -c Release --no-build -p:PackageVersion=${{ steps.sermv.outputs.version }} -o out
 
-    - run: dotnet restore
-      if: steps.sermv.outputs.skip != 'true'
-
-    - run: dotnet build -c Release --no-restore
-      if: steps.sermv.outputs.skip != 'true'
-
-    - run: |
-        mkdir -p out
-        for proj in $(find ./src -name '*.csproj'); do
-          dotnet pack "$proj" -c Release --no-build -p:PackageVersion=${{ steps.sermv.outputs.version }} -o out
-        done
-      if: steps.sermv.outputs.skip != 'true'
-
-    - run: |
+    - name: Publish to GitHub NuGet Feed
+      if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
+      run: |
         dotnet nuget push "out/*.nupkg" \
-          --source github \
+          --source "github" \
           --api-key ${{ secrets.GITHUB_PAT }} \
           --skip-duplicate
-      if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
