@@ -1,0 +1,78 @@
+name: Deploy Minor Release NuGet Package 
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+    types: [closed]
+    paths:
+      - 'src/**'
+      - '**/*.csproj'
+      - '.github/workflows/nuget-deploy-develop.yml'
+
+jobs:
+  deploy-develop:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+        cache: 'nuget'
+
+    - uses: gittools/actions/gitversion/setup@v0.11.0
+      with:
+        versionSpec: '5.x'
+
+    - id: gitversion
+      uses: gittools/actions/gitversion/execute@v0.11.0
+
+    - id: sermv
+      run: |
+        VERSION="${{ steps.gitversion.outputs.fullSemVer }}"
+        if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
+          echo "skip=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.9(-.*)?$ ]]; then
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          SUFFIX="${BASH_REMATCH[3]:-}"
+          NEW_MINOR=$((MINOR + 1))
+          VERSION="$MAJOR.$NEW_MINOR.0$SUFFIX"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Setup NuGet config
+      if: steps.sermv.outputs.skip != 'true'
+      run: |
+        dotnet nuget add source "https://nuget.pkg.github.com/Seoka-Design-Studio/index.json" \
+          --name github \
+          --username ${{ secrets.GITHUB_USERNAME }} \
+          --password ${{ secrets.GITHUB_PAT }} \
+          --store-password-in-clear-text
+
+    - run: dotnet restore
+      if: steps.sermv.outputs.skip != 'true'
+
+    - run: dotnet build -c Release --no-restore
+      if: steps.sermv.outputs.skip != 'true'
+
+    - run: |
+        mkdir -p out
+        for proj in $(find ./src -name '*.csproj'); do
+          dotnet pack "$proj" -c Release --no-build -p:PackageVersion=${{ steps.sermv.outputs.version }} -o out
+        done
+      if: steps.sermv.outputs.skip != 'true'
+
+    - run: |
+        dotnet nuget push "out/*.nupkg" \
+          --source github \
+          --api-key ${{ secrets.GITHUB_PAT }} \
+          --skip-duplicate
+      if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
