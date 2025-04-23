@@ -7,7 +7,7 @@ on:
     paths:
       - 'src/**'
       - '**/*.csproj'
-      - '.github/workflows/nuget-deploy-develop.yml'
+      - '.github/workflows/minor.yml'
 
 jobs:
   deploy:
@@ -22,7 +22,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
-        cache: 'nuget' # Cache NuGet packages
+        cache: true # Cache NuGet packages
 
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v0.11.0
