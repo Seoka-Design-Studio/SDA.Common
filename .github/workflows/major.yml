@@ -18,11 +18,13 @@ jobs:
       with:
         fetch-depth: 0 # Required for GitVersion to work properly
 
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
         cache: true # Cache NuGet packages
+    
 
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v0.11.0
@@ -86,7 +88,7 @@ jobs:
 
     - name: Restore dependencies
       if: steps.sermv.outputs.skip != 'true'
-      run: dotnet restore
+      run: dotnet restore --locked-mode
 
     - name: Build and Pack
       if: steps.sermv.outputs.skip != 'true'
