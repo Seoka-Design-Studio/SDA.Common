@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>Seoka Design Agency Common Core</Title>
+    <Authors>Moshele Seoka</Authors>
+    <Company>Seoka Design Agency</Company>
+    <copyright>© 2025 Seoka Design Agency. All rights reserved.</copyright>
+    <Description>The Core NuGet package offers key building blocks for your application, making it
+      easier to work with data and services. It provides foundational components like a base model
+      for handling data, a standardized response format for API results, and a common structure for
+      managing service interactions. This package helps reduce repetitive code, improve
+      maintainability, and ensure consistency across your application.</Description>
+    <PackageProjectUrl>https://github.com/Seoka-Design-Studio/SDA.Common</PackageProjectUrl>
+    <PackageTags>Core Common SDA Data Modeling</PackageTags>
+    <RepositoryUrl>https://github.com/Seoka-Design-Studio/SDA.Common</RepositoryUrl>
+    <AssemblyVersion>0.0.0.1</AssemblyVersion>
+    <FileVersion>0.0.0.1</FileVersion>
+    <PackAsTool>True</PackAsTool>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\Archive\SDA.Common\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>
