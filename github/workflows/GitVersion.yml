@@ -1,104 +1,36 @@
-name: CI NuGet Deploy with GitVersion + sermv
-on:
-  push:
-    branches: [develop, main]
-  pull_request:
-    branches: [develop, main]
-    paths:
-      - 'src/**'
-      - '**/*.csproj'
-      - '.github/workflows/nuget-deploy.yml'
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0 # Required for GitVersion to work properly
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '8.0.x'
-        cache: 'nuget' # Cache NuGet packages
-
-    - name: Setup GitVersion
-      uses: gittools/actions/gitversion/setup@v0.11.0
-      with:
-        versionSpec: '5.x'
-
-    - name: Run GitVersion
-      id: gitversion
-      uses: gittools/actions/gitversion/execute@v0.11.0
-
-    - name: Process version (Semantic Release Manager)
-      id: sermv
-      run: |
-        echo "Processing version with sermv..."
-        VERSION="${{ steps.gitversion.outputs.fullSemVer }}"
-        
-        # Skip early if pull request
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "Pull request detected - skipping package publishing"
-          echo "skip=true" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        
-        # Check if version ends with .9
-        if [[ $VERSION =~ ^([0-9]+)\.([0-9]+)\.9(-.*)?$ ]]; then
-          # Extract major and minor versions
-          MAJOR="${BASH_REMATCH[1]}"
-          MINOR="${BASH_REMATCH[2]}"
-          SUFFIX="${BASH_REMATCH[3]:-}"
-          
-          # Increment minor version and set patch to 0
-          NEW_MINOR=$((MINOR + 1))
-          NEW_VERSION="$MAJOR.$NEW_MINOR.0$SUFFIX"
-          
-          echo "Version $VERSION ends with .9 - incrementing to $NEW_VERSION"
-          VERSION="$NEW_VERSION"
-        else
-          echo "Version $VERSION does not end with .9 - using as is."
-        fi
-        
-        echo "Using version: $VERSION"
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-    - name: Setup NuGet credentials
-      if: steps.sermv.outputs.skip != 'true'
-      run: |
-        # Create NuGet.config with credentials
-        cat << EOF > NuGet.config
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <packageSources>
-            <add key="github" value="https://nuget.pkg.github.com/Seoka-Design-Studio/index.json" />
-          </packageSources>
-          <packageSourceCredentials>
-            <github>
-              <add key="Username" value="${{ secrets.GITHUB_USERNAME }}" />
-              <add key="ClearTextPassword" value="${{ secrets.GITHUB_PAT }}" />
-            </github>
-          </packageSourceCredentials>
-        </configuration>
-        EOF
-
-    - name: Restore dependencies
-      if: steps.sermv.outputs.skip != 'true'
-      run: dotnet restore
-
-    - name: Build and Pack
-      if: steps.sermv.outputs.skip != 'true'
-      run: |
-        dotnet build -c Release --no-restore
-        dotnet pack -c Release --no-build -p:PackageVersion=${{ steps.sermv.outputs.version }} -o out
-
-    - name: Publish to GitHub NuGet Feed
-      if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
-      run: |
-        dotnet nuget push "out/*.nupkg" \
-          --source "github" \
-          --api-key ${{ secrets.GITHUB_PAT }} \
-          --skip-duplicate
+mode: ContinuousDeployment
+branches:
+  main:
+    tag: ''
+    increment: Minor
+    prevent-increment-of-merged-branch-version: true
+    track-merge-target: true
+    regex: ^main$
+    source-branches:
+      - develop
+  develop:
+    tag: 'beta'
+    increment: Patch
+    track-merge-target: true
+    regex: ^develop$
+  feature:
+    tag: 'alpha'
+    increment: Patch
+    regex: ^features?[\\/]
+  hotfix:
+    tag: 'hotfix'
+    increment: Patch
+    regex: ^hotfix[\\/]
+  release:
+    tag: 'rc'
+    increment: Minor
+    regex: ^release[\\/]
+  support:
+    tag: 'support'
+    increment: Patch
+    regex: ^support[\\/]
+versioning-strategy: ContinuousDeployment
+assembly-versioning-scheme: MajorMinorPatch
+commit-date-format: yyyy-MM-dd
+ignore:
+  sha: []
