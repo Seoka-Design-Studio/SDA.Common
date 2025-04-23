@@ -88,7 +88,7 @@ jobs:
 
     - name: Restore dependencies
       if: steps.sermv.outputs.skip != 'true'
-      run: dotnet restore --locked-mode
+      run: dotnet restore SDA.Common.sln
 
     - name: Build and Pack
       if: steps.sermv.outputs.skip != 'true'
