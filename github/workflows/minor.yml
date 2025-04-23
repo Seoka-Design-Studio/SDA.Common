@@ -78,7 +78,7 @@ jobs:
           <packageSourceCredentials>
             <github>
               <add key="Username" value="${{ secrets.GITHUB_USERNAME }}" />
-              <add key="ClearTextPassword" value="${{ secrets.GITHUB_PAT }}" />
+              <add key="ClearTextPassword" value="${{ secrets.NUGET_API_KEY }}" />
             </github>
           </packageSourceCredentials>
         </configuration>
