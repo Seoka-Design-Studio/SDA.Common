@@ -1,4 +1,4 @@
-name: Deploy Minor Release NuGet Package.
+name: Deploy Minor Release NuGet Package
 on:
   push:
     branches: [develop]
@@ -7,7 +7,7 @@ on:
     paths:
       - 'src/**'
       - '**/*.csproj'
-      - '.github/workflows/minor.yml'
+      - '.github/workflows/nuget-deploy-develop.yml'
 
 jobs:
   deploy:
@@ -23,6 +23,7 @@ jobs:
       with:
         dotnet-version: '8.0.x'
         cache: true # Cache NuGet packages
+        lock-file: false
 
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v0.11.0
@@ -66,27 +67,18 @@ jobs:
         echo "Using version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Create NuGet.config dynamically
+    - name: Validate NuGet.config exists
       run: |
-        echo "Creating NuGet.config file for GitHub Packages..."
-        cat << EOF > NuGet.config
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <packageSources>
-            <add key="github" value="https://nuget.pkg.github.com/Seoka-Design-Studio/index.json" />
-          </packageSources>
-          <packageSourceCredentials>
-            <github>
-              <add key="Username" value="${{ secrets.GITHUB_USERNAME }}" />
-              <add key="ClearTextPassword" value="${{ secrets.NUGET_API_KEY }}" />
-            </github>
-          </packageSourceCredentials>
-        </configuration>
-        EOF
+        if [ ! -f "NuGet.config" ]; then
+          echo "::error::NuGet.config file not found in repository root"
+          exit 1
+        fi
+        echo "NuGet.config found with contents:"
+        cat NuGet.config
 
     - name: Restore dependencies
       if: steps.sermv.outputs.skip != 'true'
-      run: dotnet restore SDA.Common.sln --use-lock-file
+      run: dotnet restore SDA.Common.sln
 
     - name: Build and Pack
       if: steps.sermv.outputs.skip != 'true'
@@ -99,5 +91,5 @@ jobs:
       run: |
         dotnet nuget push "out/*.nupkg" \
           --source "github" \
-          --api-key ${{ secrets.GITHUB_PAT }} \
+          --api-key ${{ secrets.NUGET_API_KEY }} \
           --skip-duplicate

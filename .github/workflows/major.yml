@@ -1,4 +1,4 @@
-name: Deploy Major Release NuGet Package.
+name: Deploy Major Release NuGet Package
 on:
   push:
     branches: [main]
@@ -8,7 +8,6 @@ on:
       - 'src/**'
       - '**/*.csproj'
       - '.github/workflows/major.yml'
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,24 +16,19 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 0 # Required for GitVersion to work properly
-
-
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
         cache: true # Cache NuGet packages
-    
-
+        lock-file: false # Disable lock file requirement
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v0.11.0
       with:
         versionSpec: '5.x'
-
     - name: Run GitVersion
       id: gitversion
       uses: gittools/actions/gitversion/execute@v0.11.0
-
     - name: Process version (Semantic Release Manager)
       id: sermv
       run: |
@@ -67,39 +61,18 @@ jobs:
         
         echo "Using version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-    - name: Create NuGet.config dynamically
-      run: |
-        echo "Creating NuGet.config file for GitHub Packages..."
-        cat << EOF > NuGet.config
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <packageSources>
-            <add key="github" value="https://nuget.pkg.github.com/Seoka-Design-Studio/index.json" />
-          </packageSources>
-          <packageSourceCredentials>
-            <github>
-              <add key="Username" value="${{ secrets.GITHUB_USERNAME }}" />
-              <add key="ClearTextPassword" value="${{ secrets.NUGET_API_KEY }}" />
-            </github>
-          </packageSourceCredentials>
-        </configuration>
-        EOF
-
     - name: Restore dependencies
       if: steps.sermv.outputs.skip != 'true'
-      run: dotnet restore SDA.Common.sln --use-lock-file
-
+      run: dotnet restore SDA.Common.sln
     - name: Build and Pack
       if: steps.sermv.outputs.skip != 'true'
       run: |
         dotnet build -c Release --no-restore
         dotnet pack -c Release --no-build -p:PackageVersion=${{ steps.sermv.outputs.version }} -o out
-
     - name: Publish to GitHub NuGet Feed
       if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
       run: |
         dotnet nuget push "out/*.nupkg" \
           --source "github" \
-          --api-key ${{ secrets.GITHUB_PAT }} \
+          --api-key ${{ secrets.NUGET_API_KEY }} \
           --skip-duplicate
