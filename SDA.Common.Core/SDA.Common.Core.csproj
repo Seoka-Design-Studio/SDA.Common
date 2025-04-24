@@ -21,7 +21,6 @@
     <FileVersion>0.0.0.1</FileVersion>
     <PackAsTool>True</PackAsTool>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>

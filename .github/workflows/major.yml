@@ -21,6 +21,8 @@ jobs:
         with:
           dotnet-version: "8.0.x"
           cache: true # Cache NuGet packages
+          cache-dependency-path: '**/packages.lock.json'
+          
       - name: Setup GitVersion
         uses: gittools/actions/gitversion/setup@v0.11.0
         with:
