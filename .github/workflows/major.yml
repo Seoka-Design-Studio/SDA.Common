@@ -66,7 +66,9 @@ jobs:
         if: steps.sermv.outputs.skip != 'true'
         run: |
          echo "🔍 Checking if NuGet source 'seoka-design-agency' already exists..."
-         if dotnet nuget list source | grep -q "seoka-design-agency"; then
+         SOURCE_EXISTS=$(dotnet nuget list source | grep -c "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json")
+         
+         if [ "$SOURCE_EXISTS" -gt 0 ]; then
           echo "✅ NuGet source 'seoka-design-agency' already exists. Skipping add."
           else
             echo "➕ Adding NuGet source 'seoka-design-agency'..."
