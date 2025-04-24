@@ -65,11 +65,17 @@ jobs:
       - name: Setup NuGet credentials
         if: steps.sermv.outputs.skip != 'true'
         run: |
-          dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
-            --name "github" \
+         echo "🔍 Checking if NuGet source 'seoka-design-agency' already exists..."
+         if dotnet nuget list source | grep -q "seoka-design-agency"; then
+          echo "✅ NuGet source 'seoka-design-agency' already exists. Skipping add."
+          else
+            echo "➕ Adding NuGet source 'seoka-design-agency'..."
+            dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --name "seoka-design-agency" \
             --username "${{ github.repository_owner }}" \
             --password "${{ secrets.NUGET_API_KEY }}" \
             --store-password-in-clear-text
+            fi
       - name: Find project path
         id: find_path
         run: echo "path=$(find . -type f -name 'SDA.Common.Core.csproj')" >> $GITHUB_OUTPUT
@@ -88,6 +94,6 @@ jobs:
         if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
         run: |
           dotnet nuget push "out/*.nupkg" \
-            --source "github" \
+            --source "seoka-design-agency" \
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --skip-duplicate
