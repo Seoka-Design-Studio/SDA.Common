@@ -21,7 +21,6 @@ jobs:
       with:
         dotnet-version: '8.0.x'
         cache: true # Cache NuGet packages
-        lock-file: false # Disable lock file requirement
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v0.11.0
       with:
@@ -63,7 +62,7 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
     - name: Restore dependencies
       if: steps.sermv.outputs.skip != 'true'
-      run: dotnet restore SDA.Common.sln
+      run: dotnet restore
     - name: Build and Pack
       if: steps.sermv.outputs.skip != 'true'
       run: |
