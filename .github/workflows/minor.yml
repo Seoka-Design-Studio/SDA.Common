@@ -66,14 +66,14 @@ jobs:
         echo "Using version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Validate NuGet.config exists
+    - name: Setup NuGet credentials
+      if: steps.sermv.outputs.skip != 'true'
       run: |
-        if [ ! -f "NuGet.config" ]; then
-          echo "::error::NuGet.config file not found in repository root"
-          exit 1
-        fi
-        echo "NuGet.config found with contents:"
-        cat NuGet.config
+        dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+          --name "github" \
+          --username "${{ github.repository_owner }}" \
+          --password "${{ secrets.NUGET_API_KEY }}" \
+          --store-password-in-clear-text
 
     - name: Restore dependencies
       if: steps.sermv.outputs.skip != 'true'
