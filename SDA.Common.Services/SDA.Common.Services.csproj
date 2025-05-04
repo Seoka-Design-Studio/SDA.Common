@@ -24,11 +24,30 @@ Easy integration into Azure-hosted .NET 8 microservices.
 
 Ideal for building flexible, asynchronous, and event-driven APIs in a microservices-based environment.</Description>
     <Copyright>© 2025 Seoka Design Agency. All rights reserved.</Copyright>
+    <PackageProjectUrl>https://github.com/Seoka-Design-Studio/SDA.Common</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/Seoka-Design-Studio/SDA.Common</RepositoryUrl>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="MassTransit" Version="8.4.0" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
