@@ -23,8 +23,19 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
-        cache: true # Cache NuGet packages
-        cache-dependency-path: '**/packages.lock.json'
+    
+    # Create the NuGet packages directory first to ensure it exists for caching
+    - name: Create NuGet packages directory
+      run: mkdir -p ~/.nuget/packages
+    
+    # Cache NuGet packages AFTER ensuring the directory exists
+    - name: Cache NuGet packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
     
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v0.11.0
@@ -74,12 +85,13 @@ jobs:
         
         echo "Using version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "skip=false" >> $GITHUB_OUTPUT
     
     - name: Setup NuGet credentials
       if: steps.sermv.outputs.skip != 'true'
       run: |
         echo "🔍 Checking if NuGet source 'seoka-design-agency' already exists..."
-        SOURCE_EXISTS=$(dotnet nuget list source | grep -c "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json")
+        SOURCE_EXISTS=$(dotnet nuget list source | grep -c "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" || true)
         if [ "$SOURCE_EXISTS" -gt 0 ]; then
           echo "✅ NuGet source 'seoka-design-agency' already exists. Skipping add."
         else
@@ -87,7 +99,7 @@ jobs:
           dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
           --name "seoka-design-agency" \
           --username "${{ github.repository_owner }}" \
-          --password "${{ secrets.NUGET_API_KEY }}" \
+          --password "${{ secrets.GITHUB_TOKEN }}" \
           --store-password-in-clear-text
         fi
     
@@ -95,10 +107,15 @@ jobs:
       if: steps.sermv.outputs.skip != 'true'
       run: dotnet restore --use-lock-file
     
-    - name: Build and Pack
+    - name: Build
+      if: steps.sermv.outputs.skip != 'true'
+      run: dotnet build --no-restore -c Release
+    
+    - name: Pack projects
       if: steps.sermv.outputs.skip != 'true'
       run: |
-        dotnet build --no-restore
+        # Create output directory
+        mkdir -p out
         
         # Find all project files in the src directory
         echo "Finding all .csproj files to pack..."
@@ -114,7 +131,11 @@ jobs:
     - name: Publish to GitHub NuGet Feed
       if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
       run: |
-        dotnet nuget push "out/*.nupkg" \
-          --source "seoka-design-agency" \
-          --api-key ${{ secrets.NUGET_API_KEY }} \
-          --skip-duplicate
+        for PACKAGE in out/*.nupkg
+        do
+          echo "Publishing $PACKAGE"
+          dotnet nuget push "$PACKAGE" \
+            --source "seoka-design-agency" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
+        done
