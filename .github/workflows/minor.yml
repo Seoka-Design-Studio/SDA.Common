@@ -1,4 +1,4 @@
-name: Deploy Beta NuGet Package
+name: Deploy Beta NuGet Package to GitHub Packages
 
 on:
   push:
@@ -10,44 +10,24 @@ on:
       - '**/*.csproj'
       - '.github/workflows/develop.yml'
 
+env:
+  NUGET_SOURCE_NAME: 'github'
+  NUGET_SOURCE_URL: 'https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json'
+  PACKAGE_OUTPUT_DIR: 'artifacts/packages'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
+    - name: Checkout repository
       uses: actions/checkout@v3
       with:
         fetch-depth: 0 # Required for GitVersion to work properly
     
-    - name: Setup .NET
+    - name: Setup .NET 8.x
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
-        
-    # Fix for the NuGet packaging issue by examining the project files
-    - name: Check project structure
-      run: |
-        echo "Repository structure:"
-        find . -type f -name "*.csproj" | sort
-        
-        echo "Content of a sample project file:"
-        SAMPLE_PROJECT=$(find . -name "*.csproj" | head -1)
-        if [ -n "$SAMPLE_PROJECT" ]; then
-          cat "$SAMPLE_PROJECT"
-        fi
-    
-    # Create the NuGet packages directory first to ensure it exists for caching
-    - name: Create NuGet packages directory
-      run: mkdir -p ~/.nuget/packages
-    
-    # Cache NuGet packages AFTER ensuring the directory exists
-    - name: Cache NuGet packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
     
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v0.11.0
@@ -65,10 +45,10 @@ jobs:
         echo "MajorMinorPatch: ${{ steps.gitversion.outputs.majorMinorPatch }}"
         echo "PreReleaseTag: ${{ steps.gitversion.outputs.preReleaseTag }}"
     
-    - name: Process version (Semantic Release Manager)
+    - name: Process version
       id: sermv
       run: |
-        echo "Processing version with sermv..."
+        echo "Processing version..."
         VERSION="${{ steps.gitversion.outputs.fullSemVer }}"
         
         # Skip early if pull request
@@ -80,15 +60,11 @@ jobs:
         
         # Check if version ends with .9
         if [[ $VERSION =~ ^([0-9]+)\.([0-9]+)\.9(-.*)?$ ]]; then
-          # Extract major and minor versions
           MAJOR="${BASH_REMATCH[1]}"
           MINOR="${BASH_REMATCH[2]}"
           SUFFIX="${BASH_REMATCH[3]:-}"
-          
-          # Increment minor version and set patch to 0
           NEW_MINOR=$((MINOR + 1))
           NEW_VERSION="$MAJOR.$NEW_MINOR.0$SUFFIX"
-          
           echo "Version $VERSION ends with .9 - incrementing to $NEW_VERSION"
           VERSION="$NEW_VERSION"
         else
@@ -102,56 +78,45 @@ jobs:
     - name: Setup NuGet credentials
       if: steps.sermv.outputs.skip != 'true'
       run: |
-        echo "🔍 Checking if NuGet source 'seoka-design-agency' already exists..."
-        SOURCE_EXISTS=$(dotnet nuget list source | grep -c "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" || true)
-        if [ "$SOURCE_EXISTS" -gt 0 ]; then
-          echo "✅ NuGet source 'seoka-design-agency' already exists. Skipping add."
-        else
-          echo "➕ Adding NuGet source 'seoka-design-agency'..."
-          dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
-          --name "seoka-design-agency" \
+        echo "Setting up NuGet credentials..."
+        dotnet nuget add source "${{ env.NUGET_SOURCE_URL }}" \
+          --name "${{ env.NUGET_SOURCE_NAME }}" \
           --username "${{ github.repository_owner }}" \
           --password "${{ secrets.GITHUB_TOKEN }}" \
           --store-password-in-clear-text
-        fi
     
     - name: Restore dependencies
       if: steps.sermv.outputs.skip != 'true'
       run: dotnet restore --use-lock-file
     
-    - name: Build
+    - name: Build solution
       if: steps.sermv.outputs.skip != 'true'
       run: dotnet build --no-restore -c Release
+    
+    - name: Create output directory
+      if: steps.sermv.outputs.skip != 'true'
+      run: mkdir -p ${{ env.PACKAGE_OUTPUT_DIR }}
     
     - name: Pack projects
       if: steps.sermv.outputs.skip != 'true'
       run: |
-        # Create output directory
-        mkdir -p out
-        
-        # Find all project files in the repository
-        echo "Finding all .csproj files to pack..."
-        PROJECT_FILES=$(find . -name "*.csproj" -not -path "*/\.*")
-        
-        # Pack each project with specific NuGet properties to fix path issues
-        for PROJECT in $PROJECT_FILES
-        do
-          echo "Packing $PROJECT with version ${{ steps.sermv.outputs.version }}"
-          dotnet pack "$PROJECT" -c Release --no-build \
-            -p:PackageVersion=${{ steps.sermv.outputs.version }} \
-            -p:NuspecOutputPath="$GITHUB_WORKSPACE/out" \
-            -p:OutputPath="$GITHUB_WORKSPACE/out" \
-            -o "$GITHUB_WORKSPACE/out"
-        done
+        echo "Packing projects with version ${{ steps.sermv.outputs.version }}"
+        dotnet pack -c Release --no-build \
+          -p:PackageVersion=${{ steps.sermv.outputs.version }} \
+          -p:PackageOutputPath=${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }} \
+          -p:RepositoryUrl=https://github.com/${{ github.repository }} \
+          -p:RepositoryType=git \
+          -o ${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }}
     
-    - name: Publish to GitHub NuGet Feed
+    - name: List generated packages
+      if: steps.sermv.outputs.skip != 'true'
+      run: ls -la ${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }}
+    
+    - name: Publish to GitHub Packages
       if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
       run: |
-        for PACKAGE in out/*.nupkg
-        do
-          echo "Publishing $PACKAGE"
-          dotnet nuget push "$PACKAGE" \
-            --source "seoka-design-agency" \
-            --api-key ${{ secrets.GITHUB_TOKEN }} \
-            --skip-duplicate
-        done
+        echo "Publishing packages to GitHub Packages..."
+        dotnet nuget push "${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg" \
+          --source "${{ env.NUGET_SOURCE_NAME }}" \
+          --api-key ${{ secrets.GITHUB_TOKEN }} \
+          --skip-duplicate
