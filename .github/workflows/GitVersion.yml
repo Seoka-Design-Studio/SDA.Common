@@ -1,36 +1,54 @@
 mode: ContinuousDeployment
+major-version-bump-message: '\+semver:\s?(breaking|major)'
+minor-version-bump-message: '\+semver:\s?(feature|minor)'
+patch-version-bump-message: '\+semver:\s?(fix|patch)'
+no-bump-message: '\+semver:\s?(none|skip)'
+assembly-versioning-scheme: MajorMinorPatch
+tag-prefix: 'v'
+commit-message-incrementing: Enabled
+commit-date-format: yyyy-MM-dd
+versioning-strategy: ContinuousDeployment
+
 branches:
   main:
+    regex: ^main$
     tag: ''
     increment: Minor
     prevent-increment-of-merged-branch-version: true
     track-merge-target: true
-    regex: ^main$
     source-branches:
       - develop
+  
   develop:
+    regex: ^develop$
     tag: 'beta'
     increment: Patch
     track-merge-target: true
-    regex: ^develop$
+  
   feature:
+    regex: ^features?[\\/]
     tag: 'alpha'
     increment: Patch
-    regex: ^features?[\\/]
+  
   hotfix:
+    regex: ^hotfix[\\/]
     tag: 'hotfix'
     increment: Patch
-    regex: ^hotfix[\\/]
+  
   release:
+    regex: ^release[\\/]
     tag: 'rc'
     increment: Minor
-    regex: ^release[\\/]
+  
   support:
+    regex: ^support[\\/]
     tag: 'support'
     increment: Patch
-    regex: ^support[\\/]
-versioning-strategy: ContinuousDeployment
-assembly-versioning-scheme: MajorMinorPatch
-commit-date-format: yyyy-MM-dd
+  
+  pull-request:
+    tag: 'pr'
+    increment: Inherit
+    tag-number-pattern: '[/-](?<number>\d+)[-/]'
+
 ignore:
   sha: []
