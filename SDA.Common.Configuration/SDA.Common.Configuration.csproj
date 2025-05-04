@@ -4,6 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>Seoka Design Agency Common Configuration</Title>
+    <Authors>Moshele Seoka</Authors>
+    <Company>Seoka Design Agency</Company>
   </PropertyGroup>
 
   <ItemGroup>

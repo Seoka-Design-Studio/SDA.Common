@@ -23,7 +23,7 @@ namespace SDA.Common.Configuration.Extensions
             string connectionString
         )
         {
-            ArgumentException.ThrowIfNullOrEmpty(connectionString, nameof(connectionString));
+            ArgumentException.ThrowIfNullOrEmpty(connectionString);
             host.UseSerilog(
                 (context, services, loggerConfiguration) =>
                     loggerConfiguration

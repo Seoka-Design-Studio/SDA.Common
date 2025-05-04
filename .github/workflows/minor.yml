@@ -1,4 +1,4 @@
-name: Deploy Minor Release NuGet Package
+name: Deploy Beta NuGet Package
 
 on:
   push:
@@ -34,6 +34,13 @@ jobs:
     - name: Run GitVersion
       id: gitversion
       uses: gittools/actions/gitversion/execute@v0.11.0
+      
+    - name: Display GitVersion outputs
+      run: |
+        echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
+        echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
+        echo "MajorMinorPatch: ${{ steps.gitversion.outputs.majorMinorPatch }}"
+        echo "PreReleaseTag: ${{ steps.gitversion.outputs.preReleaseTag }}"
     
     - name: Process version (Semantic Release Manager)
       id: sermv
@@ -93,9 +100,16 @@ jobs:
       run: |
         dotnet build --no-restore
         
-        # Pack each project separately with the same version
-        # Replace these project paths with your actual project paths
-        dotnet pack src/SDA.Common.Core/SDA.Common.Core.csproj -c Release --no-build -p:PackageVersion=${{ steps.sermv.outputs.version }} -o out
+        # Find all project files in the src directory
+        echo "Finding all .csproj files to pack..."
+        PROJECT_FILES=$(find ./src -name "*.csproj")
+        
+        # Pack each project
+        for PROJECT in $PROJECT_FILES
+        do
+          echo "Packing $PROJECT with version ${{ steps.sermv.outputs.version }}"
+          dotnet pack "$PROJECT" -c Release --no-build -p:PackageVersion=${{ steps.sermv.outputs.version }} -o out
+        done
     
     - name: Publish to GitHub NuGet Feed
       if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
