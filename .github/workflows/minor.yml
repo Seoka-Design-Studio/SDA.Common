@@ -1,5 +1,4 @@
-name: Build and Publish NuGet Package (Optimized Parallel)
-
+name: Build and Publish Minor Release NuGet Package
 on:
   push:
     branches: [develop]
