@@ -1,4 +1,4 @@
-name: Deploy Beta NuGet Package to GitHub Packages
+name: Build and Publish NuGet Package (Parallel)
 
 on:
   push:
@@ -13,121 +13,143 @@ on:
 env:
   NUGET_SOURCE_NAME: 'seoka-design-agency'
   NUGET_SOURCE_URL: 'https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json'
-  PACKAGE_OUTPUT_DIR: 'artifacts/packages'
+  PACKAGE_OUTPUT_DIR: 'artifacts'
+  DOTNET_VERSION: '8.0.x'
 
 jobs:
-  deploy:
+  determine-version:
+    name: Determine Package Version
     runs-on: ubuntu-latest
+    outputs:
+      semver: ${{ steps.version.outputs.version }}
+      skip-publish: ${{ steps.version.outputs.skip }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
-    - name: Setup .NET 8.x
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '8.0.x'
-    
     - name: Setup GitVersion
-      uses: gittools/actions/gitversion/setup@v0.11.0
+      uses: gittools/actions/gitversion/setup@v0
       with:
-        versionSpec: '5.x'
-    
-    - name: Run GitVersion
+        versionSpec: '6.x'
+
+    - name: Execute GitVersion
       id: gitversion
-      uses: gittools/actions/gitversion/execute@v0.11.0
-      
-    - name: Display GitVersion outputs
-      run: |
-        echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
-        echo "FullSemVer: ${{ steps.gitversion.outputs.fullSemVer }}"
-        echo "MajorMinorPatch: ${{ steps.gitversion.outputs.majorMinorPatch }}"
-        echo "PreReleaseTag: ${{ steps.gitversion.outputs.preReleaseTag }}"
-    
+      uses: gittools/actions/gitversion/execute@v0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Process version
-      id: sermv
+      id: version
       run: |
-        echo "Processing version..."
-        VERSION="${{ steps.gitversion.outputs.fullSemVer }}"
-        
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           echo "Pull request detected - skipping package publishing"
           echo "skip=true" >> $GITHUB_OUTPUT
           exit 0
         fi
         
+        VERSION="${{ steps.gitversion.outputs.semVer }}"
+        
+        # Handle .9 version increment if needed
         if [[ $VERSION =~ ^([0-9]+)\.([0-9]+)\.9(-.*)?$ ]]; then
           MAJOR="${BASH_REMATCH[1]}"
           MINOR="${BASH_REMATCH[2]}"
           SUFFIX="${BASH_REMATCH[3]:-}"
           NEW_MINOR=$((MINOR + 1))
-          NEW_VERSION="$MAJOR.$NEW_MINOR.0$SUFFIX"
-          echo "Version $VERSION ends with .9 - incrementing to $NEW_VERSION"
-          VERSION="$NEW_VERSION"
-        else
-          echo "Version $VERSION does not end with .9 - using as is."
+          VERSION="$MAJOR.$NEW_MINOR.0$SUFFIX"
+          echo "Adjusted version to $VERSION"
         fi
         
-        echo "Using version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "skip=false" >> $GITHUB_OUTPUT
-    
-    - name: Setup NuGet credentials
-      if: steps.sermv.outputs.skip != 'true'
+
+  build:
+    name: Build Solution
+    needs: determine-version
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Run tests (optional)
+      run: dotnet test --configuration Release --no-build --verbosity normal
+
+  package:
+    name: Create NuGet Packages
+    needs: [determine-version, build]
+    if: needs.determine-version.outputs.skip-publish != 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Create output directory
+      run: mkdir -p ${{ env.PACKAGE_OUTPUT_DIR }}
+
+    - name: Pack projects
       run: |
-        echo "Setting up NuGet credentials..."
-        
-        # Check if source exists before trying to remove it
-        if dotnet nuget list source | grep -q "${{ env.NUGET_SOURCE_NAME }}"; then
-          echo "Source exists, removing it first..."
-          dotnet nuget remove source "${{ env.NUGET_SOURCE_NAME }}"
-        else
-          echo "Source doesn't exist yet, will add it."
-        fi
-        
-        # Add source with current credentials
+        dotnet pack --configuration Release --no-build \
+          --output ./${{ env.PACKAGE_OUTPUT_DIR }} \
+          /p:Version=${{ needs.determine-version.outputs.semver }} \
+          /p:RepositoryUrl=https://github.com/${{ github.repository }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: nuget-packages
+        path: ${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg
+
+  publish:
+    name: Publish to GitHub Packages
+    needs: package
+    if: needs.determine-version.outputs.skip-publish != 'true' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: nuget-packages
+        path: ${{ env.PACKAGE_OUTPUT_DIR }}
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup NuGet credentials
+      run: |
         dotnet nuget add source "${{ env.NUGET_SOURCE_URL }}" \
           --name "${{ env.NUGET_SOURCE_NAME }}" \
           --username "${{ github.repository_owner }}" \
           --password "${{ secrets.GITHUB_TOKEN }}" \
           --store-password-in-clear-text
-        
-        # Verify source was configured
-        dotnet nuget list source
-    
-    - name: Restore dependencies
-      if: steps.sermv.outputs.skip != 'true'
-      run: dotnet restore --use-lock-file
-    
-    - name: Build solution
-      if: steps.sermv.outputs.skip != 'true'
-      run: dotnet build --no-restore -c Release
-    
-    - name: Create output directory
-      if: steps.sermv.outputs.skip != 'true'
-      run: mkdir -p ${{ env.PACKAGE_OUTPUT_DIR }}
-    
-    - name: Pack projects
-      if: steps.sermv.outputs.skip != 'true'
+
+    - name: Publish packages
       run: |
-        echo "Packing projects with version ${{ steps.sermv.outputs.version }}"
-        dotnet pack -c Release --no-build \
-          -p:PackageVersion=${{ steps.sermv.outputs.version }} \
-          -p:PackageOutputPath=${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }} \
-          -p:RepositoryUrl=https://github.com/${{ github.repository }} \
-          -p:RepositoryType=git \
-          -o ${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }}
-    
-    - name: List generated packages
-      if: steps.sermv.outputs.skip != 'true'
-      run: ls -la ${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }}
-    
-    - name: Publish to GitHub Packages
-      if: steps.sermv.outputs.skip != 'true' && github.event_name == 'push'
-      run: |
-        echo "Publishing packages to GitHub Packages..."
-        dotnet nuget push "${{ github.workspace }}/${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg" \
+        dotnet nuget push ./${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg \
           --source "${{ env.NUGET_SOURCE_NAME }}" \
-          --api-key ${{ secrets.GITHUB_TOKEN }} \
+          --api-key "${{ secrets.GITHUB_TOKEN }}" \
           --skip-duplicate
