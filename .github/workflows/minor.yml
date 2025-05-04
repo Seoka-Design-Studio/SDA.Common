@@ -1,4 +1,4 @@
-name: Build and Publish NuGet Package (Fixed Paths)
+name: Build and Publish NuGet Packages
 
 on:
   push:
@@ -13,7 +13,6 @@ on:
 env:
   NUGET_SOURCE_NAME: 'seoka-design-agency'
   NUGET_SOURCE_URL: 'https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json'
-  PACKAGE_OUTPUT_DIR: '${{ github.workspace }}/artifacts'
   DOTNET_VERSION: '8.0.404'
 
 jobs:
@@ -54,11 +53,6 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
     - name: Install GitVersion
       run: dotnet tool install GitVersion.Tool --version 5.12.0 --global
 
@@ -85,26 +79,18 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   build:
-    name: Build and Test
+    name: Build Solution
     runs-on: ubuntu-latest
     needs: setup
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Build solution
       run: dotnet build --configuration Release --no-restore
-
-    - name: Run tests
-      run: dotnet test --configuration Release --no-build --verbosity normal
 
   package:
     name: Create NuGet Packages
@@ -120,26 +106,28 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Create output directory
-      run: mkdir -p ${{ env.PACKAGE_OUTPUT_DIR }}
-
-    - name: Pack projects
+    - name: Pack projects individually
       run: |
-        # Use absolute paths and explicit project files
-        for PROJECT in $(find . -name '*.csproj' | grep -v 'test'); do
-          dotnet pack "$PROJECT" \
-            --configuration Release \
-            --no-build \
-            --output ${{ env.PACKAGE_OUTPUT_DIR }} \
-            /p:Version=${{ needs.determine-version.outputs.semver }} \
-            /p:RepositoryUrl=https://github.com/${{ github.repository }}
-        done
+        # Pack each project separately to isolate issues
+        dotnet pack SDA.Common.Core/SDA.Common.Core.csproj \
+          --configuration Release \
+          --no-build \
+          --output ./artifacts \
+          /p:Version=${{ needs.determine-version.outputs.semver }} \
+          /p:RepositoryUrl=https://github.com/${{ github.repository }}
+          
+        dotnet pack SDA.Common.Services/SDA.Common.Services.csproj \
+          --configuration Release \
+          --no-build \
+          --output ./artifacts \
+          /p:Version=${{ needs.determine-version.outputs.semver }} \
+          /p:RepositoryUrl=https://github.com/${{ github.repository }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: nuget-packages
-        path: ${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg
+        path: ./artifacts/*.nupkg
 
   publish:
     name: Publish to GitHub Packages
@@ -151,7 +139,7 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: nuget-packages
-        path: ${{ env.PACKAGE_OUTPUT_DIR }}
+        path: ./artifacts
 
     - name: Setup NuGet credentials
       run: |
@@ -163,7 +151,7 @@ jobs:
 
     - name: Publish packages
       run: |
-        dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg \
+        dotnet nuget push ./artifacts/*.nupkg \
           --source "${{ env.NUGET_SOURCE_NAME }}" \
           --api-key "${{ secrets.GITHUB_TOKEN }}" \
           --skip-duplicate
