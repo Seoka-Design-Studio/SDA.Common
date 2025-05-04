@@ -78,8 +78,13 @@ jobs:
       run: |
         echo "Setting up NuGet credentials..."
         
-        # Remove source if it exists
-        dotnet nuget remove source "${{ env.NUGET_SOURCE_NAME }}" || true
+        # Check if source exists before trying to remove it
+        if dotnet nuget list source | grep -q "${{ env.NUGET_SOURCE_NAME }}"; then
+          echo "Source exists, removing it first..."
+          dotnet nuget remove source "${{ env.NUGET_SOURCE_NAME }}"
+        else
+          echo "Source doesn't exist yet, will add it."
+        fi
         
         # Add source with current credentials
         dotnet nuget add source "${{ env.NUGET_SOURCE_URL }}" \
