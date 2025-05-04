@@ -4,11 +4,50 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>SDA.Common.Services</Title>
+    <Description>This library provides a robust foundation for defining and registering message consumers across your company's microservices architecture. Built on MassTransit with RabbitMQ support, this package is designed to facilitate scalable, event-driven architectures. It seamlessly integrates with PostmarkServices, Azure Service Bus, and other commonly used libraries for API development, ensuring smooth communication between services.
+
+Intended for use in Azure-hosted .NET 8 microservices, this package supports reliable, high-performance message handling and enables future-proof integration with cloud-based services. By leveraging the power of MassTransit, RabbitMQ, and other essential tools, you can create flexible, asynchronous workflows that scale with your business needs.
+
+Features include:
+
+Message consumer registration and management across microservices.
+
+Integration with PostmarkServices for reliable email delivery.
+
+Support for Azure Service Bus for cloud-native event-driven messaging.
+
+Designed for scalable, high-performance architectures based on MassTransit.
+
+Easy integration into Azure-hosted .NET 8 microservices.
+
+Ideal for building flexible, asynchronous, and event-driven APIs in a microservices-based environment.</Description>
+    <Copyright>© 2025 Seoka Design Agency. All rights reserved.</Copyright>
+    <PackageProjectUrl>https://github.com/Seoka-Design-Studio/SDA.Common</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/Seoka-Design-Studio/SDA.Common</RepositoryUrl>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="MassTransit" Version="8.4.0" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

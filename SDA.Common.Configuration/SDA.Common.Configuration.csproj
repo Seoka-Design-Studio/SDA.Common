@@ -4,7 +4,43 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>Seoka Design Agency Common Configuration</Title>
+    <Authors>Moshele Seoka</Authors>
+    <Company>Seoka Design Agency</Company>
+    <Description>This NuGet package extends core Microsoft ASP.NET Core functionality by centralizing the configuration of common tools used in modern .NET applications. It integrates and simplifies setup for:
+
+AutoMapper: Auto-discovery and registration of mapping profiles
+
+FluentValidation: Automatic validator registration and ASP.NET Core integration
+
+Serilog: Structured logging configuration via appsettings, with console and MSSQL sinks
+
+With a focus on reducing boilerplate and enforcing consistent patterns, the package offers extension methods and startup helpers to:
+
+Configure dependency injection in a clean and modular way
+
+Enable convention-based AutoMapper profile loading
+
+Register and bind validators automatically with FluentValidation
+
+Configure Serilog logging pipelines with console and MSSQL outputs
+
+Ideal for scalable .NET APIs and web apps that rely on AutoMapper, FluentValidation, and Serilog, this package promotes maintainability and faster startup configuration.</Description>
+    <Copyright>© 2025 Seoka Design Agency. All rights reserved.</Copyright>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>AutoMapper,FluentValidation,Serilog,ASP.NET Core,Logging,Dependency Injection,Configuration,Extensions,Middleware,Validation,Structured Logging,MSSQL,Console Logging,.NET</PackageTags>
+    <PackAsTool>True</PackAsTool>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="13.0.1" />
@@ -18,6 +54,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SDA.Common.Core\SDA.Common.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
