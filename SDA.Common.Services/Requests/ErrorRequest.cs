@@ -2,9 +2,8 @@
 
 namespace SDA.Common.Services.Requests
 {
-
     /// <summary>
-    /// Represents an error that occurred during the processing of an HTTP request.
+    /// Represents an error that occurred during the processing of an HTTP request
     /// </summary>
     public class ErrorRequest
     {
@@ -42,6 +41,5 @@ namespace SDA.Common.Services.Requests
 
             return sb.ToString();
         }
-
     }
 }
